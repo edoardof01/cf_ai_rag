@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-config
+  labels:
+    app: rag-api
+data:
+  # Puntamenti interni al cluster Kubernetes
+  # Milvus
+  MILVUS_HOST: "milvus-standalone-service.default.svc.cluster.local"
+  MILVUS_PORT: "19530"
+  MILVUS_COLLECTION: "rag_documents"
+  # Ollama
+  # La porta è definita nel service ollama-service.yaml
+  # default è il namespace, svc indica i Service, cluster.local è il dominio del cluster.
+  OLLAMA_BASE_URL: "http://ollama-service.default.svc.cluster.local:11434" 
+  OLLAMA_MODEL: "qwen2.5:7b"
+  # Redis (sessioni conversazionali)
+  REDIS_HOST: "redis-service.default.svc.cluster.local"
+  REDIS_PORT: "6379"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-api
+  labels:
+    app: rag-api
+spec:
+  replicas: 1
+  selector: # Seleziona i pod con label rag-api
+    matchLabels:
+      app: rag-api
+  template: # Definisce come creare i pod
+    metadata:
+      labels: # Inserisce questa label nei pod creati
+        app: rag-api
+    spec:
+      containers:
+      - name: rag-api
+        image: rag-bot:latest
+        imagePullPolicy: IfNotPresent # Non scaricare l'immagine se è già presente
+        
+        # Le porte esposte dal container
+        ports:
+        - containerPort: 8000
+        
+        # Iniezione variabili ambiente
+        envFrom:
+        - configMapRef:
+            name: rag-config
+            
+        # Liveness probe: K8s riavvierà il pod se questo endpoint smette di rispondere 200 OK
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          
+        # Readiness probe: K8s invierà traffico solo se l'app è pronta
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-api-service
+  labels:
+    app: rag-api
+spec:
+  type: ClusterIP  # Il Service ora è chiuso al mondo esterno (accessibile solo dall'Ingress o da altri Pod)
+  selector: # Trova i pod con label rag-api e inoltra le richieste sulla porta 8000 dei pod
+    app: rag-api
+  ports:
+  - port: 80 # La porta "esterna" del Service (quella che chiamano gli altri)
+    targetPort: 8000 # La porta "interna" del Pod (dove ascolta FastAPI)
+    protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress # Il Portiere che smista il traffico HTTP in ingresso
+metadata:
+  name: rag-api-ingress
+  labels:
+    app: rag-api
+  annotations:
+    # Se usi Minikube, devi prima abilitare l'addon: minikube addon enable ingress
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: api.rag.local # Dominio fasullo per test locale
+    http:
+      paths:
+      - path: / # Cattura tutte le richieste verso la root dell'URL
+        pathType: Prefix
+        backend:
+          service:
+            name: rag-api-service # Invia il traffico al nostro Service
+            port:
+              number: 80 # Sulla porta esterna del Service

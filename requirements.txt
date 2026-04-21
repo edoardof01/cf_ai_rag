@@ -1,0 +1,19 @@
+# PDF text extraction
+PyMuPDF>=1.24.0
+
+# Embedding model (pre-trained, Phase 1)
+sentence-transformers>=3.0.0
+
+# Milvus vector database client
+pymilvus>=2.4.0
+
+# HTTP requests (per Ollama REST API)
+requests>=2.31.0
+
+# Environment variables
+python-dotenv>=1.0.0
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9  # Necessario per l'upload di file via FastAPI (UploadFile)
+redis>=5.0.0  # Client Redis per la persistenza delle sessioni conversazionali
+rank-bm25>=0.2.2  # BM25 lexical search per hybrid retrieval

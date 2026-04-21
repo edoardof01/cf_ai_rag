@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-config
+  labels:
+    app: rag-bot
+data:
+  # In Kubernetes, non usiamo "localhost" per parlare tra Pod.
+  # Qui metterai l'indirizzo interno del servizio Milvus su K8s.
+  # (Es. se installi Milvus con Helm, il nome del servizio di default è spesso "my-milvus")
+  MILVUS_HOST: "my-milvus.default.svc.cluster.local"
+  MILVUS_PORT: "19530"
+  MILVUS_COLLECTION: "rag_documents"
+  
+  # Stessa cosa per Ollama. Qui metterai il nome del servizio K8s di Ollama.
+  OLLAMA_BASE_URL: "http://ollama-service.default.svc.cluster.local:11434"
+  OLLAMA_MODEL: "llama3"
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rag-bot-cli
+  labels:
+    app: rag-bot
+spec:
+  containers:
+  - name: rag-bot
+    # Questa è l'immagine che abbiamo appena buildato!
+    # (Per Minikube, ricordati di caricare l'immagine dentro minikube con 'minikube image load rag-bot:latest')
+    image: rag-bot:latest
+    imagePullPolicy: IfNotPresent
+    
+    # Importante: siccome il nostro bot è interattivo (si aspetta l'input da tastiera),
+    # dobbiamo dire a K8s di tenere aperto il terminale, altrimenti il pod crasha subito!
+    stdin: true
+    tty: true
+    
+    # Ecco come iniettiamo tutte le variabili dal ConfigMap!
+    envFrom:
+    - configMapRef:
+        name: rag-config
