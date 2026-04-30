@@ -10,10 +10,24 @@ venv/
 # Environment
 .env
 
-# Data (i PDF possono essere grandi)
-docs/*.pdf
+# Data (user PDFs — not part of the repo)
+docs/**/*.pdf
 
 # IDE
 .idea/
 .vscode/
 *.swp
+
+# OS
+.DS_Store
+
+# Build artifacts
+report.zip
+report/*.log
+report/*.aux
+report/*.toc
+report/*.out
+report/*.synctex.gz
+
+# Gemini / Antigravity
+.gemini/
